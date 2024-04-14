@@ -1,0 +1,8 @@
+---
+- name: Converge
+  hosts: all
+  roles:
+    - role: genlab.metr1c
+      metr1c_version: 0.1.0
+      platform1c_version: 8.3.24.1467
+      platform1c_admin_pw_path: "secrets/platform1c.yaml"

@@ -1,0 +1,23 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    # https://github.com/ansible/molecule/issues/3587#issuecomment-1158650179
+    - name: "Include default vars"
+      ansible.builtin.include_vars:
+        dir: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/"
+        extensions: [ 'yml' ]
+
+    - name: Test metr1c exit code
+      ansible.builtin.command: "{{ oneget_dir }}/metr1c -h"
+      register: metr1c_version_check
+      changed_when: false
+      failed_when:
+        - metr1c_version_check.rc != 0
+
+    - name: "Assert version correctness"
+      ansible.builtin.assert:
+        that: "metr1c_version in metr1c_version_check.stdout"
+        success_msg: "Expected metr1c version available ({{ metr1c_version }})"
+        fail_msg: "Expected version '{{ metr1c_version }}'; version string is '{{ metr1c_version_check.stdout }}'"

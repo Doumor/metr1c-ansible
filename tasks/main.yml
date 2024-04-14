@@ -1,0 +1,78 @@
+---
+- name: "Install the requested metr1c version"
+  tags: [metr1c]
+  block:
+    - name: "Check if the metr1c installation is of the required version"
+      tags: [metr1c]
+      register: metr1c_version_check
+      failed_when: false
+      changed_when: false
+      environment:
+        PATH: "{{ metr1c_dir }}:{{ ansible_env.PATH }}"
+      ansible.builtin.command:
+        cmd: "metr1c -h"
+
+    - name: "Assert version correctness"
+      ansible.builtin.assert:
+        that: "metr1c_version in metr1c_version_check.stdout"
+        success_msg: "Expected metr1c version available ({{ metr1c_version }})"
+        fail_msg: "Expected version '{{ metr1c_version }}'; version string is '{{ metr1c_version_check.stdout }}'"
+
+  rescue:
+    - name: "Remove the previous installation - '{{ metr1c_dir }}'"
+      tags: [metr1c]
+      ansible.builtin.file:
+        path: "{{ metr1c_dir }}"
+        state: absent
+
+    - name: "Ensure that the destination directory exists - '{{ metr1c_dir }}'"
+      tags: [metr1c]
+      ansible.builtin.file:
+        path: "{{ metr1c_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: "Download and unarchive metr1c release v{{ metr1c_version }}"
+      tags: [metr1c]
+      ansible.builtin.unarchive:
+        src: "https://github.com/Doumor/metr1c/releases/download/v{{ metr1c_version }}/metr1c.tar.gz"
+        dest: "{{ metr1c_dir }}"
+        remote_src: true
+
+    - name: "Ensure that metr1c binaries are in the PATH (via /etc/profile)"
+      tags: [metr1c]
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:{{ metr1c_dir }}"
+        state: present
+
+- name: "Check that metr1c binary is accessible and functional"
+  tags: [metr1c]
+  changed_when: false
+  environment:
+    PATH: "{{ metr1c_dir }}:{{ ansible_env.PATH }}"
+  ansible.builtin.command:
+    cmd: "metr1c -h"
+
+- name: "Get metr1c credentials"
+  tags: [metr1c]
+  ansible.builtin.include_vars:
+    file: "{{ platform1c_admin_pw_path }}"
+
+- name: "Create/update service"
+  tags: [metr1c]
+  ansible.builtin.template:
+    src: metr1c.service.j2
+    dest: /etc/systemd/system/metr1c.service
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: "Start metr1c service"
+  tags: [metr1c]
+  ansible.builtin.systemd_service:
+   name: "metr1c.service"
+   state: started
+   enabled: true
